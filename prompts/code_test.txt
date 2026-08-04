@@ -1,0 +1,1 @@
+Write a Python function named unique_sorted that receives a list of integers and returns the sorted unique values. Return only the code.

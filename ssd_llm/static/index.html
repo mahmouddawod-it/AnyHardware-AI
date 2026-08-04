@@ -1,0 +1,876 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SSD-LLM Chat</title>
+<style>
+  :root {
+    --bg: #0f1420;
+    --panel: #161d2f;
+    --panel2: #1d2740;
+    --border: #28334d;
+    --text: #dbe4f5;
+    --muted: #8b97ad;
+    --accent: #4f8cff;
+    --accent2: #35c98e;
+    --danger: #ff5f6d;
+    --user-bubble: #24437e;
+    --code-bg: #0b0f1a;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: "Segoe UI", system-ui, sans-serif;
+    background: var(--bg); color: var(--text); height: 100vh; overflow: hidden;
+  }
+  #app { display: flex; height: 100vh; }
+
+  /* Sidebar */
+  aside {
+    width: 330px; min-width: 330px; background: var(--panel);
+    border-right: 1px solid var(--border); overflow-y: auto; padding: 16px;
+    display: flex; flex-direction: column; gap: 14px;
+  }
+  aside h1 { font-size: 16px; margin: 0; display: flex; align-items: center; gap: 8px; }
+  aside h1 .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); }
+  aside h1 .dot.on { background: var(--accent2); box-shadow: 0 0 8px var(--accent2); }
+  aside h2 { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 6px 0 0; }
+  .field { display: flex; flex-direction: column; gap: 4px; }
+  .field label { font-size: 12px; color: var(--muted); }
+  .field input[type=text], .field input[type=number], .field select, .field textarea {
+    background: var(--panel2); border: 1px solid var(--border); color: var(--text);
+    border-radius: 6px; padding: 8px; font-size: 13px; width: 100%; outline: none;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus { border-color: var(--accent); }
+  .field textarea { resize: vertical; min-height: 64px; font-family: inherit; }
+  .row { display: flex; gap: 8px; align-items: flex-start; }
+  .row .field { flex: 1; }
+  .auto { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); margin-bottom: 2px; }
+  .auto input { accent-color: var(--accent); }
+  button {
+    background: var(--accent); color: #fff; border: none; border-radius: 6px;
+    padding: 9px 12px; font-size: 13px; cursor: pointer; font-weight: 600;
+  }
+  button:hover { filter: brightness(1.1); }
+  button.secondary { background: var(--panel2); border: 1px solid var(--border); color: var(--text); font-weight: 500; }
+  button.danger { background: var(--danger); }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  .btn-row { display: flex; gap: 8px; }
+  .btn-row button { flex: 1; }
+  .status-box {
+    background: var(--panel2); border: 1px solid var(--border); border-radius: 8px;
+    padding: 10px; font-size: 12px; color: var(--muted); line-height: 1.6;
+  }
+  .status-box b { color: var(--text); }
+  .hint { font-size: 11px; color: var(--muted); line-height: 1.5; }
+
+  /* Chat */
+  main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  header {
+    padding: 10px 20px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    background: var(--panel);
+  }
+  header .title { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  header .sub { font-size: 12px; color: var(--muted); }
+  header .actions { display: flex; gap: 8px; flex-shrink: 0; }
+  .badge { background: var(--accent); color: #fff; font-size: 11px; border-radius: 10px; padding: 2px 8px; margin-left: 8px; }
+  #messages { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 14px; }
+  .msg { max-width: 86%; padding: 10px 14px; border-radius: 12px; font-size: 14px; line-height: 1.55; overflow-wrap: break-word; }
+  .msg.user { align-self: flex-end; background: var(--user-bubble); }
+  .msg.assistant { align-self: flex-start; background: var(--panel); border: 1px solid var(--border); }
+  .msg p { margin: 0 0 8px; }
+  .msg p:last-child { margin-bottom: 0; }
+  .msg pre.code {
+    background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px;
+    padding: 10px 12px; font-family: Consolas, monospace; font-size: 13px;
+    overflow-x: auto; margin: 8px 0; white-space: pre-wrap;
+  }
+  .chat-img { max-height: 260px; max-width: 100%; border-radius: 10px; border: 1px solid var(--border); display: block; margin: 6px 0; }
+  .empty { margin: auto; color: var(--muted); text-align: center; font-size: 14px; line-height: 1.8; }
+  .empty code { background: var(--panel2); padding: 2px 6px; border-radius: 4px; font-size: 12px; }
+  .error-line { color: var(--danger); font-size: 13px; white-space: pre-wrap; }
+  footer { border-top: 1px solid var(--border); padding: 12px 16px; background: var(--panel); display: flex; gap: 10px; align-items: flex-end; }
+  footer textarea {
+    flex: 1; background: var(--panel2); border: 1px solid var(--border); color: var(--text);
+    border-radius: 8px; padding: 10px; font-size: 14px; font-family: inherit; resize: none;
+    outline: none; min-height: 44px; max-height: 160px;
+  }
+  footer textarea:focus { border-color: var(--accent); }
+  footer .left { display: flex; align-items: center; gap: 8px; padding-bottom: 2px; }
+  #chips { display: flex; flex-wrap: wrap; gap: 8px; padding: 8px 16px 0; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; background: var(--panel2); border: 1px solid var(--border); border-radius: 8px; padding: 4px 8px; font-size: 12px; }
+  .chip img { height: 28px; width: auto; border-radius: 4px; }
+  .chip b { cursor: pointer; color: var(--danger); font-size: 14px; }
+  .agent-toggle { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); padding: 7px 10px; background: var(--panel2); border: 1px solid var(--border); border-radius: 8px; cursor: pointer; white-space: nowrap; }
+  .agent-toggle input { accent-color: var(--accent); }
+  .typing { color: var(--muted); font-size: 12px; padding: 2px 4px; }
+  .cursor { display: inline-block; width: 8px; background: var(--accent); animation: blink 1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+  .tool-card { border: 1px solid var(--border); border-radius: 8px; background: var(--panel2); margin: 6px 0; overflow: hidden; font-size: 12px; }
+  .tool-head { padding: 6px 10px; display: flex; justify-content: space-between; align-items: center; background: var(--panel); }
+  .tool-name { color: var(--accent2); font-weight: 600; font-family: Consolas, monospace; }
+  .tool-args { background: var(--code-bg); padding: 8px 10px; margin: 0; overflow-x: auto; white-space: pre-wrap; color: var(--muted); }
+  .tool-result { background: var(--code-bg); padding: 8px 10px; margin: 0; border-top: 1px solid var(--border); white-space: pre-wrap; color: var(--text); max-height: 200px; overflow: auto; }
+  .tool-shot { display: block; max-width: 100%; max-height: 300px; border-top: 1px solid var(--border); }
+  .agent-text { margin-top: 4px; }
+  .tok-kw { color: var(--accent); font-weight: 600; }
+  .tok-str { color: #7ee2a8; }
+  .tok-num { color: #f6c177; }
+  .tok-cmt { color: var(--muted); font-style: italic; }
+
+  /* Activity indicator */
+  .activity-wrap { position: relative; }
+  .activity-btn { display: flex; align-items: center; gap: 6px; }
+  .activity-btn .adot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); flex-shrink: 0; }
+  .activity-btn.busy .adot { background: var(--accent); box-shadow: 0 0 8px var(--accent); animation: pulse 1s infinite; }
+  @keyframes pulse { 50% { opacity: .25; } }
+  .activity-panel {
+    position: absolute; top: calc(100% + 8px); right: 0; width: 330px;
+    background: var(--panel2); border: 1px solid var(--border); border-radius: 10px;
+    padding: 12px; z-index: 40; box-shadow: 0 8px 24px rgba(0,0,0,.45);
+    font-size: 12px; color: var(--muted); line-height: 1.5;
+  }
+  .activity-panel b { color: var(--text); }
+  .activity-panel .ap-title { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 10px 0 4px; }
+  .activity-panel .proc { display: flex; justify-content: space-between; gap: 8px; padding: 3px 0; border-bottom: 1px solid var(--border); }
+  .activity-panel .proc:last-of-type { border-bottom: none; }
+
+  /* Conversations modal */
+  .modal-backdrop {
+    position: fixed; inset: 0; background: rgba(0,0,0,.5);
+    display: flex; align-items: center; justify-content: center; z-index: 50;
+  }
+  .modal-backdrop[hidden] { display: none; }
+  .modal {
+    width: 560px; max-width: 92vw; max-height: 78vh; background: var(--panel);
+    border: 1px solid var(--border); border-radius: 12px; display: flex;
+    flex-direction: column; padding: 16px; gap: 12px;
+  }
+  .modal.small { width: 400px; }
+  .modal-head { display: flex; justify-content: space-between; align-items: center; font-weight: 600; font-size: 15px; }
+  .conv-list { overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+  .conv-search input {
+    width: 100%; background: var(--panel2); border: 1px solid var(--border); color: var(--text);
+    border-radius: 6px; padding: 8px; font-size: 13px; outline: none;
+  }
+  .conv-search input:focus { border-color: var(--accent); }
+  .conv-item {
+    display: flex; align-items: center; gap: 10px; background: var(--panel2);
+    border: 1px solid var(--border); border-radius: 8px; padding: 10px;
+  }
+  .conv-item .ci-main { flex: 1; min-width: 0; cursor: pointer; }
+  .conv-item .ci-title { font-size: 13px; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .conv-item .ci-sub { font-size: 11px; color: var(--muted); }
+  .conv-item .ci-actions { display: flex; gap: 6px; flex-shrink: 0; }
+  .conv-item .ci-actions button { padding: 5px 8px; font-size: 11px; }
+  .conv-empty { color: var(--muted); text-align: center; padding: 20px; }
+</style>
+</head>
+<body>
+<div id="app">
+  <aside>
+    <h1><span class="dot" id="serverDot"></span>SSD-LLM</h1>
+
+    <div class="field">
+      <label>llama-server (engine path)</label>
+      <div class="row">
+        <input type="text" id="engine" placeholder="C:\...\llama-server.exe">
+        <button class="secondary" id="detectBtn" style="flex:0 0 auto" title="Detect">Detect</button>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Model (GGUF)</label>
+      <input type="text" id="model" list="modelsList" placeholder="Pick a model from models/ or type a path">
+      <datalist id="modelsList"></datalist>
+    </div>
+
+    <h2>Runtime budget</h2>
+    <div class="auto"><input type="checkbox" id="threadsAuto" checked><label for="threadsAuto">Auto threads</label></div>
+    <div class="field"><input type="number" id="threads" min="1" placeholder="0"></div>
+    <div class="auto"><input type="checkbox" id="contextAuto" checked><label for="contextAuto">Auto context</label></div>
+    <div class="field"><input type="number" id="context" min="128" step="128" placeholder="0"></div>
+    <div class="auto"><input type="checkbox" id="batchAuto" checked><label for="batchAuto">Auto batch</label></div>
+    <div class="field"><input type="number" id="batch" min="1" placeholder="0"></div>
+
+    <h2>Sampling</h2>
+    <div class="row">
+      <div class="field">
+        <label>Temperature</label>
+        <input type="number" id="temperature" min="0" max="2" step="0.1" value="0.7">
+      </div>
+      <div class="field">
+        <label>Max tokens</label>
+        <input type="number" id="max_tokens" min="1" step="16" value="512">
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Preset</label>
+      <select id="preset">
+        <option value="">Custom</option>
+        <option value="code">Code assistant</option>
+        <option value="agent">Agent (tools)</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label>System prompt</label>
+      <textarea id="system_prompt" placeholder="Optional instructions to the model"></textarea>
+    </div>
+
+    <div class="field">
+      <label>Workspace (agent file tools)</label>
+      <input type="text" id="workspace" placeholder="default: project folder">
+    </div>
+
+    <div class="auto">
+      <input type="checkbox" id="browserVisible">
+      <label for="browserVisible">Show browser window (agent)</label>
+    </div>
+    <div class="hint">Off = headless Edge. On = visible window you can watch.</div>
+
+    <div class="btn-row">
+      <button id="saveBtn">Save settings</button>
+      <button class="secondary" id="startBtn">Start</button>
+      <button class="danger" id="stopBtn">Stop</button>
+    </div>
+
+    <div class="status-box" id="statusBox">Loading…</div>
+    <div class="hint">CPU-only (-ngl 0), mmap on SSD, memory budget from the planner.</div>
+  </aside>
+
+  <main>
+    <header>
+      <div>
+        <div class="title" id="modelTitle">No model loaded<span class="badge" id="modeBadge" style="display:none"></span></div>
+        <div class="sub" id="serverSub">server: stopped</div>
+      </div>
+      <div class="actions">
+        <div class="activity-wrap">
+          <button class="secondary activity-btn" id="activityBtn" title="Background activity"><span class="adot"></span>idle</button>
+          <div class="activity-panel" id="activityPanel" hidden></div>
+        </div>
+        <button class="secondary" id="convBtn" title="Saved conversations">Conversations</button>
+        <button class="secondary" id="newChatBtn">New conversation</button>
+        <button class="danger" id="agentStopBtn" hidden title="Stop the running task">■ Stop</button>
+      </div>
+    </header>
+
+    <div id="messages">
+      <div class="empty" id="emptyState">
+        Start a conversation.<br>
+        <b>📷</b> attach an image (vision) · toggle <b>Agent</b> to use tools
+        (code, files, web search, full browser control).<br>
+        Settings in the left panel; threads / context / batch are
+        <code>auto</code> from the planner budget.
+      </div>
+    </div>
+
+    <div id="chips"></div>
+
+    <footer>
+      <div class="left">
+        <button class="secondary" id="attachBtn" title="Attach image">📷</button>
+        <input type="file" id="imgInput" accept="image/*" multiple hidden>
+        <label class="agent-toggle"><input type="checkbox" id="agentMode"><span>Agent</span></label>
+      </div>
+      <textarea id="input" placeholder="Type a message… (Enter to send, Shift+Enter for newline)" rows="1"></textarea>
+      <button id="sendBtn">Send</button>
+    </footer>
+  </main>
+</div>
+
+<div class="modal-backdrop" id="convBackdrop" hidden>
+  <div class="modal">
+    <div class="modal-head">
+      <span>Conversations</span>
+      <button class="secondary" id="convClose" title="Close">✕</button>
+    </div>
+    <div class="conv-search"><input type="text" id="convSearch" placeholder="Filter…"></div>
+    <div class="conv-list" id="convList"></div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="renameBackdrop" hidden>
+  <div class="modal small">
+    <div class="modal-head">
+      <span>Rename conversation</span>
+      <button class="secondary" id="renameClose" title="Close">✕</button>
+    </div>
+    <input type="text" id="renameInput" placeholder="Title">
+    <div class="btn-row"><button id="renameOk">Save</button></div>
+  </div>
+</div>
+
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const history = [];
+const attachments = [];
+let generating = false;
+let currentChatId = null;
+let currentChatTitle = null;
+
+const PRESETS = {
+  code: "You are an expert software engineer. Write correct, idiomatic code. When asked for code, return only the code in a fenced block.",
+  agent: "You are a helpful agent. Use the tools when they help: run_python to compute or test code, read_file/write_file to work with files, list_files to explore the workspace, web_search for current information, and the browser tools (navigate, browser_snapshot, click_element, type_text, scroll, run_js, browser_screenshot) to browse and control a web page. Keep your steps brief and cite tool results.",
+};
+
+async function post(url, body) {
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body || {}),
+  });
+  return res;
+}
+
+function collectSettings() {
+  return {
+    engine: $("engine").value.trim(),
+    model: $("model").value.trim(),
+    threads: $("threadsAuto").checked ? "auto" : parseInt($("threads").value) || 1,
+    context: $("contextAuto").checked ? "auto" : parseInt($("context").value) || 128,
+    batch: $("batchAuto").checked ? "auto" : parseInt($("batch").value) || 1,
+    temperature: parseFloat($("temperature").value) || 0.7,
+    max_tokens: parseInt($("max_tokens").value) || 512,
+    system_prompt: $("system_prompt").value,
+    workspace: $("workspace").value.trim(),
+    browser_visible: $("browserVisible").checked,
+  };
+}
+
+function applyStatus(st) {
+  $("serverDot").className = "dot" + (st.server_running ? " on" : "");
+  $("serverSub").textContent = st.server_running
+    ? `server: running (port ${st.server_port})`
+    : "server: stopped";
+
+  const p = st.plan;
+  $("statusBox").innerHTML =
+    `CPU <b>${p.threads}</b>/${st.machine.cpus} · ctx <b>${p.context}</b> · batch <b>${p.batch}</b>` +
+    `<br>RAM <b>${st.machine.ram_gib} GiB</b> · ngl <b>${p.gpu_layers}</b> · mmap <b>${p.mmap ? "on" : "off"}</b>`;
+
+  if ($("threadsAuto").checked) $("threads").placeholder = String(p.threads);
+  if ($("contextAuto").checked) $("context").placeholder = String(p.context);
+  if ($("batchAuto").checked) $("batch").placeholder = String(p.batch);
+
+  const dl = $("modelsList");
+  dl.innerHTML = "";
+  for (const m of st.models) {
+    const opt = document.createElement("option");
+    opt.value = m.path;
+    dl.appendChild(opt);
+  }
+  if (!st.models.length) {
+    const opt = document.createElement("option");
+    opt.value = "No .gguf models found in models/";
+    dl.appendChild(opt);
+  }
+
+  const s = st.settings;
+  if (!$("engine").value) $("engine").value = s.engine || st.engine_detected || "";
+  const savedModel = String(s.model || "");
+  if (!$("model").value && !/\\mmproj-|\/mmproj-/.test(savedModel)) $("model").value = savedModel;
+  $("threadsAuto").checked = s.threads === "auto";
+  $("contextAuto").checked = s.context === "auto";
+  $("batchAuto").checked = s.batch === "auto";
+  if (s.threads !== "auto") $("threads").value = s.threads;
+  if (s.context !== "auto") $("context").value = s.context;
+  if (s.batch !== "auto") $("batch").value = s.batch;
+  $("temperature").value = s.temperature;
+  $("max_tokens").value = s.max_tokens;
+  $("system_prompt").value = s.system_prompt || "";
+  if (!$("workspace").value) $("workspace").value = s.workspace || "";
+  $("browserVisible").checked = !!s.browser_visible;
+  $("modelTitle").childNodes[0].textContent = s.model ? s.model.split("\\").pop().split("/").pop() + " " : "No model loaded ";
+  updateModeBadge();
+}
+
+async function refreshStatus() {
+  const res = await fetch("/api/status");
+  applyStatus(await res.json());
+}
+
+/* --- background activity indicator --- */
+async function refreshActivity() {
+  try {
+    const res = await fetch("/api/activity");
+    applyActivity(await res.json());
+  } catch (e) {}
+}
+
+function applyActivity(a) {
+  const btn = $("activityBtn");
+  const busy = ["loading", "generating", "thinking", "tool", "final"].includes(a.state);
+  btn.className = "secondary activity-btn" + (busy ? " busy" : "");
+  let label = "idle";
+  if (a.state === "loading") label = "loading…";
+  else if (a.state === "generating") label = "generating…";
+  else if (a.state === "thinking") label = "thinking…";
+  else if (a.state === "tool") label = a.tool || "tool…";
+  else if (a.state === "final") label = "answering…";
+  btn.innerHTML = `<span class="adot"></span>${escapeHtml(label)}`;
+
+  const panel = $("activityPanel");
+  if (panel.hidden) return;
+  const elapsed = a.since ? Math.round((Date.now() / 1000 - a.since) * 10) / 10 : 0;
+  const procs = (a.processes || []).map((p) =>
+    `<div class="proc"><span>${escapeHtml(p.name)}${p.port ? ` :${p.port}` : ""}${p.visible ? " (visible)" : ""}</span><b>pid ${p.pid}</b></div>`).join("");
+  panel.innerHTML =
+    `<div class="ap-title">Current operation</div>` +
+    `<div><b>${escapeHtml(a.state)}</b>${a.tool ? ` · ${escapeHtml(a.tool)}` : ""}${elapsed ? ` · ${elapsed}s` : ""}</div>` +
+    `<div class="ap-title">Processes</div>` +
+    (procs || `<div>none</div>`) +
+    `<div class="ap-title">Server</div>` +
+    `<div class="proc"><span>llama-server</span><b>${a.server_running ? `running :${a.server_port}` : "stopped"}</b></div>` +
+    `<div class="proc"><span>browser</span><b>${a.browser_running ? "open" : "closed"}</b></div>`;
+}
+
+setInterval(refreshActivity, 1500);
+
+$("activityBtn").addEventListener("click", () => {
+  const panel = $("activityPanel");
+  panel.hidden = !panel.hidden;
+  if (!panel.hidden) refreshActivity();
+});
+
+function updateModeBadge() {
+  const badge = $("modeBadge");
+  badge.style.display = $("agentMode").checked ? "" : "none";
+  badge.textContent = "AGENT";
+}
+
+function escapeHtml(t) {
+  return String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+const HIGHLIGHT_RE = /(#.*)|("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')|\b(\d+)\b|\b(def|class|return|import|from|if|elif|else|for|while|in|not|and|or|try|except|with|as|lambda|None|True|False|pass|break|continue|raise|yield|self|global|async|await|del|is)\b/g;
+
+function highlightCode(escaped) {
+  return escaped.replace(HIGHLIGHT_RE, (m, cmt, str, num, kw) => {
+    if (cmt) return `<span class="tok-cmt">${cmt}</span>`;
+    if (str) return `<span class="tok-str">${str}</span>`;
+    if (num) return `<span class="tok-num">${num}</span>`;
+    if (kw) return `<span class="tok-kw">${kw}</span>`;
+    return m;
+  });
+}
+
+function renderContent(text) {
+  const escaped = escapeHtml(text);
+  const parts = escaped.split("```");
+  let out = "";
+  for (let i = 0; i < parts.length; i++) {
+    if (i % 2 === 1) {
+      let code = parts[i];
+      const nl = code.indexOf("\n");
+      if (nl >= 0) code = code.slice(nl + 1);
+      out += `<pre class="code">${highlightCode(code)}</pre>`;
+    } else if (parts[i].trim()) {
+      out += `<p>${parts[i].replace(/\n/g, "<br>")}</p>`;
+    }
+  }
+  return out || escaped;
+}
+
+function partsOf(m) {
+  return Array.isArray(m.content) ? m.content : [{ type: "text", text: m.content || "" }];
+}
+
+function render() {
+  const box = $("messages");
+  box.innerHTML = "";
+  if (!history.length) {
+    box.appendChild($("emptyState"));
+    return;
+  }
+  for (const m of history) {
+    const div = document.createElement("div");
+    div.className = "msg " + (m.role === "user" ? "user" : "assistant");
+    if (m.role === "user") {
+      const html = partsOf(m).map((p) => p.type === "text"
+        ? `<p>${escapeHtml(p.text).replace(/\n/g, "<br>")}</p>`
+        : `<img class="chat-img" src="${p.image_url.url}">`).join("");
+      div.innerHTML = html;
+    } else {
+      div.innerHTML = renderContent(m.content || "");
+    }
+    box.appendChild(div);
+  }
+  box.scrollTop = box.scrollHeight;
+}
+
+async function newChat() {
+  if (history.length) await saveCurrentChat();
+  currentChatId = null;
+  currentChatTitle = null;
+  history.length = 0;
+  clearAttachments();
+  render();
+  $("input").focus();
+}
+
+async function streamSSE(res, onEvent) {
+  if (!res.ok) {
+    let detail = "";
+    try { detail = (await res.json()).error || ""; } catch (e) {}
+    throw new Error(detail || `HTTP ${res.status}`);
+  }
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+    let idx;
+    while ((idx = buf.indexOf("\n")) >= 0) {
+      const line = buf.slice(0, idx).trim();
+      buf = buf.slice(idx + 1);
+      if (!line.startsWith("data:")) continue;
+      const payload = line.slice(5).trim();
+      if (payload === "[DONE]") { onEvent({ type: "done" }); continue; }
+      let obj;
+      try { obj = JSON.parse(payload); } catch (e) { continue; }
+      if (obj && obj.type) {
+        onEvent(obj);
+      } else if (obj && obj.choices && obj.choices[0] && obj.choices[0].delta) {
+        const c = obj.choices[0].delta.content || "";
+        if (c) onEvent({ type: "delta", content: c });
+      }
+    }
+  }
+  onEvent({ type: "eof" });
+}
+
+async function sendChatStream(assistantDiv, messages, settings) {
+  let full = "";
+  const res = await post("/api/chat", { messages, settings });
+  await streamSSE(res, (ev) => {
+    if (ev.type === "delta") {
+      full += ev.content;
+      assistantDiv.innerHTML = renderContent(full);
+      $("messages").scrollTop = $("messages").scrollHeight;
+    }
+  });
+  return full;
+}
+
+async function sendAgentStream(assistantDiv, messages, settings) {
+  const timeline = document.createElement("div");
+  timeline.className = "agent-timeline";
+  const textEl = document.createElement("div");
+  textEl.className = "agent-text";
+  textEl.innerHTML = `<span class="typing">Working…<span class="cursor"></span></span>`;
+  assistantDiv.innerHTML = "";
+  assistantDiv.append(timeline, textEl);
+
+  let lastCard = null;
+  let finalText = "";
+  const res = await post("/api/agent", { messages, settings });
+  await streamSSE(res, (ev) => {
+    if (ev.type === "tool_call") {
+      lastCard = document.createElement("div");
+      lastCard.className = "tool-card";
+      const head = document.createElement("div");
+      head.className = "tool-head";
+      head.innerHTML = `<span class="tool-name">${escapeHtml(ev.name)}</span>`;
+      const args = document.createElement("pre");
+      args.className = "tool-args";
+      args.textContent = JSON.stringify(ev.args, null, 1);
+      lastCard.append(head, args);
+      timeline.appendChild(lastCard);
+    } else if (ev.type === "tool_result") {
+      if (lastCard) {
+        if (ev.image) {
+          const img = document.createElement("img");
+          img.className = "tool-shot";
+          img.src = ev.image;
+          img.alt = "browser screenshot";
+          lastCard.appendChild(img);
+        }
+        const r = document.createElement("pre");
+        r.className = "tool-result";
+        r.textContent = ev.preview;
+        lastCard.appendChild(r);
+      }
+    } else if (ev.type === "delta") {
+      finalText += ev.content;
+      textEl.innerHTML = renderContent(finalText);
+    }
+    $("messages").scrollTop = $("messages").scrollHeight;
+  });
+  if (!finalText) textEl.innerHTML = "(no final answer)";
+  return finalText;
+}
+
+async function send() {
+  if (generating) return;
+  const input = $("input");
+  const text = input.value.trim();
+  const imgs = attachments.map((a) => a.url);
+  if (!text && !imgs.length) return;
+  input.value = "";
+  input.style.height = "auto";
+  clearAttachments();
+
+  const parts = [];
+  for (const url of imgs) parts.push({ type: "image_url", image_url: { url } });
+  parts.push({ type: "text", text });
+  history.push({ role: "user", content: parts.length === 1 ? parts[0].text : parts });
+  render();
+
+  generating = true;
+  $("sendBtn").disabled = true;
+  $("agentStopBtn").hidden = false;
+
+  const settings = collectSettings();
+  const system = settings.system_prompt.trim();
+  const messages = system ? [{ role: "system", content: system }, ...history] : history.slice();
+
+  const assistantDiv = document.createElement("div");
+  assistantDiv.className = "msg assistant";
+  assistantDiv.innerHTML = `<span class="typing">${$("agentMode").checked ? "Agent working" : "Generating"}<span class="cursor"></span></span>`;
+  $("messages").appendChild(assistantDiv);
+  $("messages").scrollTop = $("messages").scrollHeight;
+
+  try {
+    const final = $("agentMode").checked
+      ? await sendAgentStream(assistantDiv, messages, settings)
+      : await sendChatStream(assistantDiv, messages, settings);
+    if (final) history.push({ role: "assistant", content: final });
+  } catch (err) {
+    assistantDiv.innerHTML = `<div class="error-line">Error: ${escapeHtml(err.message || err)}</div>`;
+    history.pop();
+  } finally {
+    generating = false;
+    $("sendBtn").disabled = false;
+    $("agentStopBtn").hidden = true;
+    render();
+    refreshStatus();
+    refreshActivity();
+    await saveCurrentChat();
+  }
+}
+
+/* --- saved conversations --- */
+async function saveCurrentChat() {
+  if (!history.length) return null;
+  const mode = $("agentMode").checked ? "agent" : "chat";
+  if (!currentChatId) {
+    try {
+      const res = await fetch("/api/chats", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: history, mode }),
+      });
+      if (!res.ok) return null;
+      const meta = await res.json();
+      currentChatId = meta.id;
+      currentChatTitle = meta.title;
+      return meta;
+    } catch (e) { return null; }
+  }
+  try {
+    const res = await fetch("/api/chats/" + encodeURIComponent(currentChatId), {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ messages: history, mode }),
+    });
+    if (res.ok) {
+      const meta = await res.json();
+      currentChatTitle = meta.title;
+      return meta;
+    }
+  } catch (e) {}
+  return null;
+}
+
+async function openConvModal() {
+  $("convBackdrop").hidden = false;
+  await renderConvList($("convSearch").value);
+}
+
+async function renderConvList(filter) {
+  let chats = [];
+  try {
+    const res = await fetch("/api/chats");
+    chats = (await res.json()).chats || [];
+  } catch (e) {}
+  const list = $("convList");
+  list.innerHTML = "";
+  const f = (filter || "").trim().toLowerCase();
+  const items = chats.filter((c) => !f || String(c.title || "").toLowerCase().includes(f));
+  if (!items.length) {
+    list.innerHTML = `<div class="conv-empty">No conversations saved yet.</div>`;
+    return;
+  }
+  for (const c of items) {
+    const el = document.createElement("div");
+    el.className = "conv-item";
+    const date = new Date(c.updated * 1000).toLocaleString();
+    el.innerHTML =
+      `<div class="ci-main" data-id="${escapeHtml(c.id)}">` +
+      `<div class="ci-title">${escapeHtml(c.title)}</div>` +
+      `<div class="ci-sub">${escapeHtml(c.mode)} · ${c.msg_count} msgs · ${escapeHtml(date)}</div>` +
+      `</div>` +
+      `<div class="ci-actions">` +
+      `<button class="secondary ci-open" data-id="${escapeHtml(c.id)}" title="Open / continue">Open</button>` +
+      `<button class="secondary ci-rename" data-id="${escapeHtml(c.id)}" title="Rename">✎</button>` +
+      `<button class="danger ci-del" data-id="${escapeHtml(c.id)}" title="Delete">🗑</button>` +
+      `</div>`;
+    el.querySelector(".ci-main").addEventListener("click", () => continueChat(c.id));
+    el.querySelector(".ci-open").addEventListener("click", () => continueChat(c.id));
+    el.querySelector(".ci-rename").addEventListener("click", () => openRenameModal(c.id, c.title));
+    el.querySelector(".ci-del").addEventListener("click", () => deleteChat(c.id, c.title));
+    list.appendChild(el);
+  }
+}
+
+async function continueChat(id) {
+  let chat;
+  try {
+    const res = await fetch("/api/chats/" + encodeURIComponent(id));
+    if (!res.ok) return;
+    chat = await res.json();
+  } catch (e) { return; }
+  if (history.length) await saveCurrentChat();
+  currentChatId = chat.id;
+  currentChatTitle = chat.title;
+  history.length = 0;
+  history.push(...(chat.messages || []));
+  $("agentMode").checked = chat.mode === "agent";
+  updateModeBadge();
+  render();
+  $("convBackdrop").hidden = true;
+  $("input").focus();
+}
+
+function openRenameModal(id, title) {
+  $("renameInput").value = title || "";
+  $("renameBackdrop").hidden = false;
+  $("renameOk").onclick = async () => {
+    const t = $("renameInput").value.trim();
+    if (t && id === currentChatId) currentChatTitle = t;
+    try {
+      await fetch("/api/chats/" + encodeURIComponent(id), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: t || "Untitled" }),
+      });
+    } catch (e) {}
+    $("renameBackdrop").hidden = true;
+    await renderConvList($("convSearch").value);
+  };
+}
+
+async function deleteChat(id, title) {
+  if (!confirm(`Delete "${title}"?`)) return;
+  try {
+    await fetch("/api/chats/" + encodeURIComponent(id), { method: "DELETE" });
+  } catch (e) {}
+  if (id === currentChatId) {
+    currentChatId = null;
+    currentChatTitle = null;
+    history.length = 0;
+    render();
+  }
+  await renderConvList($("convSearch").value);
+}
+
+$("convBtn").addEventListener("click", openConvModal);
+$("convClose").addEventListener("click", () => { $("convBackdrop").hidden = true; });
+$("convBackdrop").addEventListener("click", (e) => { if (e.target === $("convBackdrop")) $("convBackdrop").hidden = true; });
+$("renameClose").addEventListener("click", () => { $("renameBackdrop").hidden = true; });
+$("renameBackdrop").addEventListener("click", (e) => { if (e.target === $("renameBackdrop")) $("renameBackdrop").hidden = true; });
+$("renameInput").addEventListener("keydown", (e) => { if (e.key === "Enter") $("renameOk").click(); });
+$("convSearch").addEventListener("input", () => renderConvList($("convSearch").value));
+
+/* --- attachments --- */
+function renderChips() {
+  const chips = $("chips");
+  chips.innerHTML = "";
+  attachments.forEach((a, i) => {
+    const c = document.createElement("span");
+    c.className = "chip";
+    c.innerHTML = `<img src="${a.url}"><span>${escapeHtml(a.name)}</span><b data-i="${i}">×</b>`;
+    chips.appendChild(c);
+  });
+}
+function clearAttachments() {
+  attachments.length = 0;
+  renderChips();
+}
+$("attachBtn").addEventListener("click", () => $("imgInput").click());
+$("imgInput").addEventListener("change", () => {
+  for (const f of $("imgInput").files) {
+    if (!f.type.startsWith("image/")) continue;
+    const r = new FileReader();
+    r.onload = () => { attachments.push({ name: f.name, url: r.result }); renderChips(); };
+    r.readAsDataURL(f);
+  }
+  $("imgInput").value = "";
+});
+$("chips").addEventListener("click", (e) => {
+  const b = e.target.closest("b");
+  if (b) { attachments.splice(+b.dataset.i, 1); renderChips(); }
+});
+
+/* --- events --- */
+$("sendBtn").addEventListener("click", send);
+$("input").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
+});
+$("newChatBtn").addEventListener("click", newChat);
+$("agentMode").addEventListener("change", updateModeBadge);
+
+$("detectBtn").addEventListener("click", async () => {
+  const st = await (await fetch("/api/status")).json();
+  if (st.engine_detected) $("engine").value = st.engine_detected;
+});
+
+$("preset").addEventListener("change", () => {
+  if (PRESETS[$("preset").value]) $("system_prompt").value = PRESETS[$("preset").value];
+});
+
+$("saveBtn").addEventListener("click", async () => {
+  const settings = collectSettings();
+  await post("/api/settings", settings);
+  await refreshStatus();
+});
+
+$("startBtn").addEventListener("click", async () => {
+  $("startBtn").disabled = true;
+  const settings = collectSettings();
+  const res = await post("/api/start", settings);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    alert("Start failed:\n" + (err.error || "unknown error"));
+  }
+  $("startBtn").disabled = false;
+  await refreshStatus();
+});
+
+$("stopBtn").addEventListener("click", async () => {
+  await post("/api/stop");
+  await refreshStatus();
+});
+
+$("agentStopBtn").addEventListener("click", async () => {
+  try {
+    await fetch("/api/stop", { method: "POST" });
+  } catch (e) {}
+});
+
+["threadsAuto", "contextAuto", "batchAuto"].forEach((id) => {
+  $(id).addEventListener("change", () => refreshStatus());
+});
+
+refreshStatus();
+refreshActivity();
+</script>
+</body>
+</html>
