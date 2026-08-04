@@ -21,6 +21,10 @@ falling into swap.
 Instead of loading a huge FP16 model layer-by-layer in Python, it keeps quantized GGUF files on your
 SSD and relies on `mmap` page caching: the OS keeps hot pages in RAM and evicts the rest automatically.
 
+## Screenshot
+
+![AnyHardware AI web UI](webui-screenshot.jpg)
+
 ---
 
 ## Features
