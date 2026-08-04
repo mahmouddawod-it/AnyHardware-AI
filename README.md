@@ -47,6 +47,42 @@ SSD and relies on `mmap` page caching: the OS keeps hot pages in RAM and evicts 
 
 ---
 
+## One-click setup (Windows)
+
+The repository ships with three helper scripts:
+
+| Script | What it does |
+| --- | --- |
+| `check-system.bat` | Scans your machine (Python, pip, curl, llama.cpp, Edge/Chrome, CPU, RAM, free disk), reports `[OK]/[WARN]/[FAIL]`, and prints the next steps. |
+| `download-models.bat` | Interactive model picker. Reads your free RAM, recommends which models fit, and downloads them with **resume support** into `models/`. |
+| `start-web.bat` | Installs/launches the web UI on http://127.0.0.1:8300 (stops any old server first). |
+
+### Setup flow
+
+```bat
+1.  double-click  check-system.bat     -> see what is missing
+2.  double-click  download-models.bat  -> pick a model that fits your RAM
+3.  double-click  start-web.bat        -> open http://127.0.0.1:8300
+```
+
+`download-models.bat` lists the official Qwen GGUF models (Qwen2.5 series) and only
+recommends the ones your free RAM can handle (models need roughly 2x their file size):
+
+| Choice | File size | Free RAM needed |
+| --- | --- | --- |
+| Qwen2.5-0.5B-Instruct (Q4_K_M) | 397 MB | ~2 GiB |
+| Qwen2.5-1.5B-Instruct (Q4_K_M) | 1.1 GB | ~4 GiB |
+| Qwen2.5-3B-Instruct (Q4_K_M) | 2.1 GB | ~6 GiB |
+| Qwen2.5-7B-Instruct (Q4_K_M) | 4.7 GB | ~10 GiB |
+| Qwen2.5-14B-Instruct (Q4_K_M) | 9.0 GB | ~18 GiB |
+
+Downloads use `curl -C -`: if the connection drops, run the script again and it resumes
+where it stopped instead of starting over. Multi-part models (7B and 14B) are fetched
+as separate `.gguf` parts; llama.cpp loads them automatically when you point it at the
+first part.
+
+---
+
 ## Quickstart
 
 ### 1. Install
@@ -120,6 +156,10 @@ ssd_llm/
     index.html    single-file web UI
 tests/            pytest suite (no GPU / llama.cpp required)
 models/           local GGUF files (gitignored, never committed)
+
+check-system.bat       machine + requirements checker (Windows)
+download-models.bat    interactive model downloader with resume (Windows)
+start-web.bat          web UI launcher (Windows)
 ```
 
 ## Testing
@@ -170,6 +210,37 @@ ssd-llm web --port 8300
 
 بعدها افتح http://127.0.0.1:8300 واختر المحرك والنموذج من الإعدادات وابدأ المحادثة. على ويندوز يمكنك
 تشغيل `start-web.bat` مباشرة.
+
+### التجهيز والتثبيت على ويندوز (بضغطة واحدة)
+
+المشروع يضم ثلاثة سكربتات جاهزة:
+
+- **`check-system.bat`** — يفحص جهازك (بايثون، pip، curl، llama.cpp، المتصفح، المعالج، الذاكرة، المساحة)
+  ويعرض لك `[OK]` / `[WARN]` / `[FAIL]` والخطوات التالية.
+- **`download-models.bat`** — قائمة تحميل تفاعلية: يقرأ الذاكرة الحرة وينصحك بالموديلات المناسبة لجهازك،
+  ويحمّل مباشرة إلى مجلد `models\` مع **دعم الاستئناف** (لو انقطعت المرة الجاية يكمل من نقطة القطع).
+- **`start-web.bat`** — يشغّل الواجهة على http://127.0.0.1:8300 (ويوقف أي سيرفر قديم أولًا).
+
+الترتيب المقترح:
+
+```bat
+1) شغّل check-system.bat      -> اعرف إيه الناقص
+2) شغّل download-models.bat   -> اختر موديل يناسب ذاكرتك
+3) شغّل start-web.bat         -> افتح http://127.0.0.1:8300
+```
+
+الموديلات المتاحة (سلسلة Qwen2.5 الرسمية) — النموذج يحتاج تقريبًا ضعف حجمه من الذاكرة:
+
+| الموديل | الحجم | ذاكرة حرة مطلوبة |
+| --- | --- | --- |
+| Qwen2.5-0.5B-Instruct (Q4_K_M) | 397 MB | ~2 GiB |
+| Qwen2.5-1.5B-Instruct (Q4_K_M) | 1.1 GB | ~4 GiB |
+| Qwen2.5-3B-Instruct (Q4_K_M) | 2.1 GB | ~6 GiB |
+| Qwen2.5-7B-Instruct (Q4_K_M) | 4.7 GB | ~10 GiB |
+| Qwen2.5-14B-Instruct (Q4_K_M) | 9.0 GB | ~18 GiB |
+
+التنزيل بيستخدم `curl -C -`، فلو قطعت النت كمل بالمشغّل مرة تانية وهيستأنف التحميل من مكانه.
+موديلات 7B و14B بتنزل كأجزاء منفصلة وllama.cpp بيحمّلها تلقائيًا لما تشاور على الجزء الأول.
 
 ### المتطلبات
 
