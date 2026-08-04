@@ -2,6 +2,17 @@
 
 **Run open GGUF language models on any machine. CPU + RAM + SSD only. No GPU required.**
 
+<div align="center">
+
+[![GitHub Repo stars](https://img.shields.io/github/stars/mahmouddawod-it/AnyHardware-AI?style=for-the-badge&logo=github&logoColor=white&label=Star%20this%20repo)](https://github.com/mahmouddawod-it/AnyHardware-AI)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
+[![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
+[![CI](https://github.com/mahmouddawod-it/AnyHardware-AI/actions/workflows/ci.yml/badge.svg)](https://github.com/mahmouddawod-it/AnyHardware-AI/actions)
+
+**If this project helps you, give it a star!** ⭐
+
+</div>
+
 AnyHardware AI (package: `ssd-llm`) is a local, zero-dependency runner for quantized GGUF models.
 It uses `llama.cpp` for inference and adds a small decision layer that sizes CPU threads, context and
 batch to your machine's real RAM budget, so models run stably on weak, GPU-less machines without
